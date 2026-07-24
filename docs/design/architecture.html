@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staff Scheduling App — Architecture</title>
+<style>
+  :root {
+    --bg: #F2F5F7;
+    --surface: #FFFFFF;
+    --surface-hub: #FBF3E7;
+    --border: #DBE2E8;
+    --border-strong: #C3CCD4;
+    --ink: #161D25;
+    --muted: #5B6773;
+    --accent: #B36A14;
+    --accent-line: #8A6A3B;
+    --shadow: 0 1px 2px rgba(22, 29, 37, 0.05), 0 1px 1px rgba(22, 29, 37, 0.03);
+
+    --sans: ui-sans-serif, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #10141B;
+      --surface: #1A2029;
+      --surface-hub: #2B2013;
+      --border: #2B333F;
+      --border-strong: #3B4552;
+      --ink: #E9ECEF;
+      --muted: #94A0AC;
+      --accent: #E3A254;
+      --accent-line: #C79A6C;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: clamp(1.75rem, 3vw + 1rem, 3.25rem) clamp(1.25rem, 4vw, 2rem) 3rem;
+  }
+
+  .head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: clamp(2rem, 4vw, 3rem);
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  h1 {
+    font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.15rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .dek {
+    font-size: 0.98rem;
+    color: var(--muted);
+    max-width: 34rem;
+    line-height: 1.5;
+    margin: 0.15rem 0 0;
+  }
+
+  .diagram {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  h2.group-label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  .nodes {
+    display: flex;
+    gap: clamp(0.6rem, 2vw, 1rem);
+  }
+
+  .nodes.of-2 > .node,
+  .nodes.of-3 > .node {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .nodes.of-1 {
+    justify-content: center;
+  }
+  .nodes.of-1 > .node {
+    width: min(100%, 26rem);
+  }
+
+  .node {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: clamp(0.75rem, 1.4vw, 1rem) clamp(0.9rem, 1.8vw, 1.2rem);
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .node.person {
+    background: transparent;
+    border: 1px dashed var(--border-strong);
+    box-shadow: none;
+  }
+
+  .node.hub {
+    background: var(--surface-hub);
+    border: 1.5px solid var(--accent);
+  }
+
+  .node-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0;
+  }
+  .node-title.mono {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    letter-spacing: -0.01em;
+  }
+
+  .node-sub {
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.45;
+    margin: 0;
+  }
+
+  .hub-tag {
+    align-self: flex-start;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 0.12rem 0.5rem;
+    margin-top: 0.15rem;
+  }
+
+  .chips {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.15rem;
+    flex-wrap: wrap;
+  }
+  .chip {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.15rem 0.45rem;
+  }
+
+  .connector {
+    height: 2.5rem;
+    width: 100%;
+  }
+  .connector svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+  }
+  .connector path {
+    fill: none;
+    stroke: var(--border-strong);
+    stroke-width: 1.4;
+  }
+
+  .foot {
+    margin-top: clamp(2rem, 4vw, 2.75rem);
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .foot strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .row, .connector {
+      animation: rise 0.5s ease both;
+    }
+    .diagram > *:nth-child(1) { animation-delay: 0.02s; }
+    .diagram > *:nth-child(2) { animation-delay: 0.10s; }
+    .diagram > *:nth-child(3) { animation-delay: 0.16s; }
+    .diagram > *:nth-child(4) { animation-delay: 0.24s; }
+    .diagram > *:nth-child(5) { animation-delay: 0.30s; }
+    .diagram > *:nth-child(6) { animation-delay: 0.38s; }
+    .diagram > *:nth-child(7) { animation-delay: 0.44s; }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  }
+
+  @media (max-width: 30rem) {
+    .node-sub { font-size: 0.72rem; }
+    .node-title.mono { font-size: 0.78rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="head">
+    <p class="eyebrow">System Architecture</p>
+    <h1>Staff Scheduling App</h1>
+    <p class="dek">How data moves between people, the app, and Firebase — one screen, nothing to explain twice.</p>
+  </div>
+
+  <div class="diagram">
+    <div class="row">
+      <h2 class="group-label">People</h2>
+      <div class="nodes of-2">
+        <div class="node person">
+          <p class="node-title">Admin</p>
+          <p class="node-sub">Manages staff, courses &amp; the weekly timetable</p>
+        </div>
+        <div class="node person">
+          <p class="node-title">Staff</p>
+          <p class="node-sub">Views their timetable, takes attendance</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector">
+      <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+        <defs>
+          <marker id="a1" markerWidth="6" markerHeight="6" refX="3" refY="5" orient="auto">
+            <path d="M0,0 L6,5 L0,10 Z" fill="var(--border-strong)"></path>
+          </marker>
+        </defs>
+        <path d="M25,0 C25,20 50,20 50,34" marker-end="url(#a1)"></path>
+        <path d="M75,0 C75,20 50,20 50,34" marker-end="url(#a1)"></path>
+      </svg>
+    </div>
+
+    <div class="row">
+      <h2 class="group-label">App</h2>
+      <div class="nodes of-1">
+        <div class="node">
+          <p class="node-title mono">Staff Scheduling App</p>
+          <p class="node-sub">React Native · iOS &amp; Android, one codebase</p>
+          <div class="chips">
+            <span class="chip">Admin screens</span>
+            <span class="chip">Staff screens</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector">
+      <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+        <defs>
+          <marker id="a2" markerWidth="6" markerHeight="6" refX="3" refY="5" orient="auto">
+            <path d="M0,0 L6,5 L0,10 Z" fill="var(--border-strong)"></path>
+          </marker>
+        </defs>
+        <path d="M50,0 C50,18 16.6,18 16.6,34" marker-end="url(#a2)"></path>
+        <path d="M50,0 L50,34" marker-end="url(#a2)"></path>
+        <path d="M50,0 C50,18 83.3,18 83.3,34" marker-end="url(#a2)"></path>
+      </svg>
+    </div>
+
+    <div class="row">
+      <h2 class="group-label">Firebase Backend</h2>
+      <div class="nodes of-3">
+        <div class="node">
+          <p class="node-title mono">Authentication</p>
+          <p class="node-sub">Email/password login, looks up role</p>
+        </div>
+        <div class="node hub">
+          <p class="node-title mono">Firestore</p>
+          <span class="hub-tag">Source of truth</span>
+          <p class="node-sub">Staff, courses, students, slots, attendance</p>
+        </div>
+        <div class="node">
+          <p class="node-title mono">Cloud Functions</p>
+          <p class="node-sub">Reacts to changes, fires notifications</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector">
+      <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+        <defs>
+          <marker id="a3" markerWidth="6" markerHeight="6" refX="3" refY="5" orient="auto">
+            <path d="M0,0 L6,5 L0,10 Z" fill="var(--border-strong)"></path>
+          </marker>
+        </defs>
+        <path d="M83.3,0 C83.3,20 50,20 50,34" marker-end="url(#a3)"></path>
+      </svg>
+    </div>
+
+    <div class="row">
+      <h2 class="group-label">Email Delivery</h2>
+      <div class="nodes of-1">
+        <div class="node">
+          <p class="node-title mono">Resend</p>
+          <p class="node-sub">Delivers the notification straight to the staff member's inbox</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="foot"><strong>Fully serverless</strong> — Firebase is the entire backend. Nothing to provision, patch, or keep running.</p>
+</div>
+
+</body>
+</html>
