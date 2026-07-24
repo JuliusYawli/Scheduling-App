@@ -236,7 +236,90 @@ The same pattern covers the "staff account created" welcome email (`onCreate` tr
 
 **Deferred for later (not in MVP):** true push notifications, i.e. an alert that appears even when the app is closed/backgrounded. That needs `expo-notifications` + device push tokens, which requires an EAS Dev Client build — the one piece of native tooling this plan otherwise avoids. See Phase 6 in §8.
 
-## 7. Architecture (module structure)
+## 7. System Diagram & Architecture
+
+### 7.1 System diagram (context view)
+
+Who talks to what, at the level of whole systems — this is the picture to
+show someone who wants to understand the app without reading code.
+
+```mermaid
+flowchart LR
+    Admin(["Admin"])
+    StaffUser(["Staff"])
+
+    subgraph App["Staff Scheduling App (React Native, iOS + Android)"]
+        direction TB
+        AdminUI["Admin screens"]
+        StaffUI["Staff screens"]
+    end
+
+    Admin --> AdminUI
+    StaffUser --> StaffUI
+
+    AdminUI <-->|login, read/write| FBAuth[("Firebase Authentication")]
+    StaffUI <-->|login, read/write| FBAuth
+    AdminUI <-->|CRUD: staff, courses,\nstudents, slots| Firestore[("Firestore Database")]
+    StaffUI <-->|read timetable,\nwrite attendance| Firestore
+    StaffUI <-->|live updates| Firestore
+
+    Firestore -->|onCreate / onUpdate\ntriggers| Functions["Firebase Cloud Functions"]
+    Functions -->|send email| Resend[("Resend Email API")]
+    Functions -->|write notification doc| Firestore
+    Resend -->|delivers| Inbox(["Staff email inbox"])
+```
+
+Everything the app does flows through Firestore as the single source of
+truth: Admin writes create data, Staff reads it (and writes attendance
+back), and any write that matters to a staff member (new slot, changed
+slot, new account) fans out to email + in-app notification through Cloud
+Functions — nothing talks to Resend except the backend.
+
+### 7.2 System architecture (layered view)
+
+How the app is put together internally, and how that maps onto Firebase's
+managed services rather than a custom backend.
+
+```mermaid
+flowchart TB
+    subgraph Client["Client — React Native + Expo app (iOS & Android)"]
+        direction TB
+        Screens["Presentation layer\nScreens (Admin / Staff / Shared) + React Navigation"]
+        StateLayer["State/data layer\nReact Query hooks + Zustand session store"]
+        DomainLayer["Domain layer\nslotConflictChecker (pure logic, no I/O)"]
+        Repos["Data access layer\nRepositories wrapping the Firebase Web SDK"]
+
+        Screens --> StateLayer
+        StateLayer --> DomainLayer
+        StateLayer --> Repos
+    end
+
+    subgraph Firebase["Firebase (managed backend, no custom servers)"]
+        direction TB
+        Auth["Authentication\nemail/password, role on user doc"]
+        Firestore[("Firestore\ncourses, subjects, staff, students,\nslots, attendance, notifications")]
+        Functions["Cloud Functions\nonStaffCreated, onSlotCreated, onSlotChanged"]
+    end
+
+    subgraph ExternalSvc["External services"]
+        direction TB
+        Resend["Resend\ntransactional email"]
+        ExpoPush["Expo Push Service\n(optional — Phase 6 only)"]
+    end
+
+    Repos -->|SDK calls| Auth
+    Repos -->|SDK calls, onSnapshot| Firestore
+    Firestore -->|triggers| Functions
+    Functions --> Resend
+    Functions -.optional, Phase 6.-> ExpoPush
+```
+
+This is a serverless architecture end to end — there's no app-managed
+server process; Firebase's Auth, Firestore, and Cloud Functions are the
+entire backend, which is what keeps setup to "create a Firebase project"
+rather than "provision and operate a server."
+
+### 7.3 Module structure
 
 ```text
 src/
