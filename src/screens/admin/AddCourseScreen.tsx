@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ScrollView, StyleSheet } from "react-native";
 import { Button, HelperText, Text, TextInput } from "react-native-paper";
 import { useAddCourse } from "../../data/queries/courses";
+import { DuplicateCourseNameError } from "../../data/repositories/courseRepository";
 import type { AdminStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<AdminStackParamList, "AddCourse">;
@@ -19,11 +20,17 @@ export default function AddCourseScreen({ navigation }: Props) {
       return;
     }
     setFormError(null);
-    await addCourse.mutateAsync({
-      name,
-      subjectNames: subjectNames.split(",").map((subject) => subject.trim()),
-    });
-    navigation.goBack();
+    try {
+      await addCourse.mutateAsync({
+        name,
+        subjectNames: subjectNames.split(",").map((subject) => subject.trim()),
+      });
+      navigation.goBack();
+    } catch (err) {
+      setFormError(
+        err instanceof DuplicateCourseNameError ? err.message : "Could not add course. Try again."
+      );
+    }
   }
 
   return (

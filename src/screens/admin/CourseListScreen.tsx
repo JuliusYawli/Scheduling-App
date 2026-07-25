@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { FlatList, StyleSheet, View } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Button, Card, Text } from "react-native-paper";
 import Centered from "../../components/Centered";
 import { useCourseList, useSubjectList } from "../../data/queries/courses";
@@ -8,7 +8,7 @@ import type { AdminStackParamList } from "../../navigation/types";
 type Props = NativeStackScreenProps<AdminStackParamList, "CourseList">;
 
 export default function CourseListScreen({ navigation }: Props) {
-  const { data: courses, isLoading } = useCourseList();
+  const { data: courses, isLoading, isRefetching, refetch } = useCourseList();
   const { data: subjects } = useSubjectList();
 
   if (isLoading || !courses) {
@@ -28,6 +28,7 @@ export default function CourseListScreen({ navigation }: Props) {
         data={courses}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
         ListEmptyComponent={
           <Centered>
             <Text>No courses added yet.</Text>

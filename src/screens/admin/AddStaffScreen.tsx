@@ -4,9 +4,12 @@ import { ScrollView, StyleSheet } from "react-native";
 import { Button, Checkbox, HelperText, Text, TextInput } from "react-native-paper";
 import { useSubjectList } from "../../data/queries/courses";
 import { useAddStaff } from "../../data/queries/staff";
+import { DuplicateEmailError } from "../../data/repositories/staffRepository";
 import type { AdminStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<AdminStackParamList, "AddStaff">;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function AddStaffScreen({ navigation }: Props) {
   const { data: subjects } = useSubjectList();
@@ -30,9 +33,21 @@ export default function AddStaffScreen({ navigation }: Props) {
       setFormError("Name, email, and password are required.");
       return;
     }
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      setFormError("Enter a valid email address.");
+      return;
+    }
+    if (password.length < 6) {
+      setFormError("Password must be at least 6 characters.");
+      return;
+    }
     setFormError(null);
-    await addStaff.mutateAsync({ name, email, contactNumber, password, subjectIds });
-    navigation.goBack();
+    try {
+      await addStaff.mutateAsync({ name, email, contactNumber, password, subjectIds });
+      navigation.goBack();
+    } catch (err) {
+      setFormError(err instanceof DuplicateEmailError ? err.message : "Could not add staff. Try again.");
+    }
   }
 
   return (
@@ -74,11 +89,6 @@ export default function AddStaffScreen({ navigation }: Props) {
       ))}
 
       {formError ? <HelperText type="error">{formError}</HelperText> : null}
-      {addStaff.isError ? (
-        <HelperText type="error">
-          {addStaff.error instanceof Error ? addStaff.error.message : "Could not add staff."}
-        </HelperText>
-      ) : null}
 
       <Button mode="contained" onPress={handleSubmit} loading={addStaff.isPending} style={styles.submit}>
         Save staff member

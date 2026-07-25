@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "react-native-paper";
 import { DAYS_OF_WEEK } from "../models";
 import type { Slot, Staff, Subject } from "../models";
@@ -9,9 +9,17 @@ interface Props {
   staff: Staff[];
   /** Hide the staff name column, e.g. on the staff member's own timetable. */
   showStaffName?: boolean;
+  /** When provided, slot cards become pressable (e.g. Admin tapping to delete). */
+  onSlotPress?: (slot: Slot) => void;
 }
 
-export default function WeeklyTimetable({ slots, subjects, staff, showStaffName = true }: Props) {
+export default function WeeklyTimetable({
+  slots,
+  subjects,
+  staff,
+  showStaffName = true,
+  onSlotPress,
+}: Props) {
   const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
   const staffById = new Map(staff.map((member) => [member.id, member]));
 
@@ -33,7 +41,12 @@ export default function WeeklyTimetable({ slots, subjects, staff, showStaffName 
               </Text>
             ) : (
               daySlots.map((slot) => (
-                <View key={slot.id} style={styles.slotCard}>
+                <Pressable
+                  key={slot.id}
+                  style={styles.slotCard}
+                  disabled={!onSlotPress}
+                  onPress={() => onSlotPress?.(slot)}
+                >
                   <Text variant="labelSmall" style={styles.time}>
                     {slot.startTime}–{slot.endTime}
                   </Text>
@@ -45,7 +58,7 @@ export default function WeeklyTimetable({ slots, subjects, staff, showStaffName 
                       {staffById.get(slot.staffId)?.name ?? "Unassigned"}
                     </Text>
                   ) : null}
-                </View>
+                </Pressable>
               ))
             )}
           </View>

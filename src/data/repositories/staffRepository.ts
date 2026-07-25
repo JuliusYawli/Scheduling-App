@@ -1,5 +1,6 @@
 import type { Staff } from "../../models";
 import { db, networkDelay, nextId } from "../mockStore";
+import { ADMIN_ACCOUNT } from "../mock/seed";
 
 export interface NewStaffInput {
   name: string;
@@ -9,6 +10,13 @@ export interface NewStaffInput {
   subjectIds: string[];
 }
 
+export class DuplicateEmailError extends Error {
+  constructor() {
+    super("A staff member with this email already exists.");
+    this.name = "DuplicateEmailError";
+  }
+}
+
 export async function list(): Promise<Staff[]> {
   await networkDelay();
   return [...db.staff];
@@ -16,6 +24,13 @@ export async function list(): Promise<Staff[]> {
 
 export async function add(input: NewStaffInput): Promise<Staff> {
   await networkDelay();
+  const normalizedEmail = input.email.trim().toLowerCase();
+  const emailTaken =
+    normalizedEmail === ADMIN_ACCOUNT.email ||
+    db.staff.some((member) => member.email.toLowerCase() === normalizedEmail);
+  if (emailTaken) {
+    throw new DuplicateEmailError();
+  }
   const staff: Staff = {
     id: nextId("staff"),
     name: input.name,

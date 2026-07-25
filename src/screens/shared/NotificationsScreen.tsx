@@ -1,4 +1,4 @@
-import { FlatList, StyleSheet, View } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { ActivityIndicator, Text } from "react-native-paper";
 import Centered from "../../components/Centered";
 import { useMarkNotificationRead, useNotificationsForStaff } from "../../data/queries/notifications";
@@ -6,7 +6,7 @@ import { useAuthStore } from "../../store/useAuthStore";
 
 export default function NotificationsScreen() {
   const { user } = useAuthStore();
-  const { data: notifications, isLoading } = useNotificationsForStaff(user?.staffId);
+  const { data: notifications, isLoading, isRefetching, refetch } = useNotificationsForStaff(user?.staffId);
   const markRead = useMarkNotificationRead();
 
   if (isLoading || !notifications) {
@@ -22,6 +22,7 @@ export default function NotificationsScreen() {
       data={notifications}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.list}
+      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
       ListEmptyComponent={
         <Centered>
           <Text>No notifications yet.</Text>

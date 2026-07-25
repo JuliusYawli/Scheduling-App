@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { FlatList } from "react-native";
+import { FlatList, RefreshControl } from "react-native";
 import { ActivityIndicator, Card, Text } from "react-native-paper";
 import Centered from "../../components/Centered";
 import { useSlotsByStaff } from "../../data/queries/slots";
@@ -11,7 +11,7 @@ type Props = NativeStackScreenProps<StaffStackParamList, "AttendanceSubjectList"
 
 export default function AttendanceSubjectListScreen({ navigation }: Props) {
   const { user } = useAuthStore();
-  const { data: slots, isLoading } = useSlotsByStaff(user?.staffId);
+  const { data: slots, isLoading, isRefetching, refetch } = useSlotsByStaff(user?.staffId);
   const { data: subjects } = useSubjectList();
 
   if (isLoading || !slots || !subjects) {
@@ -31,6 +31,7 @@ export default function AttendanceSubjectListScreen({ navigation }: Props) {
       data={sortedSlots}
       keyExtractor={(item) => item.id}
       contentContainerStyle={{ padding: 16, gap: 10 }}
+      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
       ListEmptyComponent={
         <Centered>
           <Text>You have no classes scheduled yet.</Text>
