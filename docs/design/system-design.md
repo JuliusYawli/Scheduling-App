@@ -1,6 +1,20 @@
 # Staff Scheduling Android App — System Design
 
+> **2026-07 update:** this doc was originally written against Firebase
+> (Firestore + Cloud Functions), which is what §1–§7 below describe. The app
+> since moved to **Supabase** (Postgres + Auth + Edge Functions) after
+> Google began requiring a linked billing account to enable Firestore/IAM
+> even on the free tier for new projects — Supabase's free tier needs no
+> card. The ER model (§3.1), screen flows (§4), and conflict rule (§5) are
+> unchanged; §1, §3.3, §6, and §7 below are kept for historical context but
+> describe the *original* Firebase design — see
+> `supabase/migrations/0001_init.sql` for the actual schema/RLS policies,
+> `supabase/functions/` for the actual server-side functions, and the
+> [README](../../README.md) for current setup steps.
+
 ## 1. Tech Stack (cross-platform: iOS + Android from one codebase)
+
+> Original Firebase-era stack — see the note above for what actually shipped.
 
 | Layer | Choice | Notes |
 |---|---|---|
@@ -17,6 +31,23 @@
 | Storage | Firebase Storage (optional) | Only if staff/student photos are added later — not in current spec |
 
 **Why the Web SDK over `@react-native-firebase` here:** you asked for easy setup, and the web SDK is pure JavaScript — it runs in plain Expo Go with zero native config, so there's no EAS Dev Client build standing between you and a running app. The tradeoff is weaker offline caching and no true push notifications (device-closed alerts) — neither is in your current feature list. If you add push later (§6), that phase alone will need a Dev Client build; everything else in this plan stays on Expo Go. Firestore is still preferred over Realtime Database because the data is naturally tabular/collection-shaped and Firestore's query filtering (`where('staffId', '==', ...)`, `where('dayOfWeek', '==', ...)`) is what the conflict-check rule (§6) depends on.
+
+### 1.1 What actually shipped: Supabase instead
+
+| Layer | Choice | Notes |
+|---|---|---|
+| Auth | Supabase Auth (`@supabase/supabase-js`, email/password) | Also pure JS — `AsyncStorage` passed as the session persistence adapter, no native modules. Role stored in a `profiles` row keyed by the Auth user's id |
+| Database | Supabase Postgres | Relational instead of document-based — foreign keys are real (`subjects.course_id references courses`, etc.) instead of plain ID fields. Access control is Postgres **Row Level Security** policies rather than Firestore security rules; see `supabase/migrations/0001_init.sql` |
+| Backend logic | **Supabase Edge Functions** (Deno) | Same reason as Cloud Functions: creating/deleting a staff member's Auth account needs the `service_role` key, which can't ship in the app. `create-staff` and `delete-staff` in `supabase/functions/` are the only two — everything else the app does is a direct, RLS-checked Postgres call from the client |
+| Email delivery | Not implemented | Would be a third Edge Function (e.g. triggered by a Postgres webhook on `slots` insert) calling an email API — same shape as the Firebase-era plan, just not built yet |
+| In-app alerts | `notifications` table, polled by React Query (`refetchInterval`) | Written directly by the client when a slot is created (see `slotRepository.add`) rather than by a server-side trigger — functionally the same result, one fewer moving part until real-time/webhook-driven notifications are worth the complexity |
+
+The reason for the move, not a preference: Google now requires a billing
+account linked to enable Firestore and the IAM API even for free-tier usage
+on new projects, which blocked Firebase setup entirely for this app's
+context. Supabase's free tier needs no card. Everything else about the
+plan — Expo Go compatibility, no native modules for auth, a thin
+repository layer between screens and the backend — carried over unchanged.
 
 ## 2. Features (from spec, organized into modules)
 
@@ -130,7 +161,13 @@ erDiagram
 - **Slot is the timetable row**: `(subjectId, staffId, dayOfWeek, startTime, endTime)`. This is where the "Excel sheet" weekly view (spec §2, §4) is read from — group slots by `dayOfWeek`, sort by `startTime`.
 - **Attendance is per Slot + date + student**, so the same subject on different days produces separate attendance records, and a staff member can only mark attendance for slots assigned to them.
 
-### 3.3 Firestore collection layout
+### 3.3 Firestore collection layout (superseded)
+
+> Superseded by a real Postgres schema — see `supabase/migrations/0001_init.sql`
+> for the actual tables, columns, and Row Level Security policies (the
+> `profiles`/`staff`/`courses`/`subjects`/`students`/`slots`/`attendance`/
+> `notifications` names carried over unchanged, they're just real tables
+> with foreign keys now instead of collections with plain ID fields).
 
 Firestore is document/collection-based, not relational, so the ER model above maps to top-level collections with foreign keys as plain ID fields (no native joins — queries filter by field):
 
@@ -209,7 +246,15 @@ sequenceDiagram
 
 Overlap test: two ranges `[s1,e1)` and `[s2,e2)` conflict iff `s1 < e2 AND s2 < e1`. Run this client-side before write, and optionally re-validate in a Firestore Cloud Function if you want to guard against race conditions from concurrent admins.
 
-## 6. Notifications (Email + In-App Alerts)
+## 6. Notifications (Email + In-App Alerts) — email half superseded
+
+> As shipped: in-app notifications work (§1.1) — the client writes the
+> notification row directly when a slot is created, no trigger involved.
+> Email is **not implemented**. The Cloud-Function-driven design below is
+> unchanged in shape if you build it — swap "Firestore" for "Postgres" and
+> "Cloud Function" for "Edge Function" (a Postgres webhook on `slots`
+> insert instead of an `onCreate` trigger) and the rest of this section
+> still describes the right architecture.
 
 Email can only be sent from a trusted server, never from the client app (that would mean shipping an email-provider API key inside the app bundle). So notifications are Cloud-Function-driven: a Firestore write triggers a function, which does two things in parallel — sends the email, and writes an in-app notification doc the client is already listening to.
 
@@ -236,7 +281,15 @@ The same pattern covers the "staff account created" welcome email (`onCreate` tr
 
 **Deferred for later (not in MVP):** true push notifications, i.e. an alert that appears even when the app is closed/backgrounded. That needs `expo-notifications` + device push tokens, which requires an EAS Dev Client build — the one piece of native tooling this plan otherwise avoids. See Phase 6 in §8.
 
-## 7. System Diagram & Architecture
+## 7. System Diagram & Architecture (superseded — see 7.4 for the module structure that matches what's in the repo today)
+
+> §7.1/7.2 below are the original Firebase-era diagrams — same shape, wrong
+> nouns: read "Firestore" as "Postgres", "Firebase Authentication" as
+> "Supabase Auth", and "Cloud Functions" as "Edge Functions"
+> (`supabase/functions/create-staff` and `delete-staff`, not the
+> onStaffCreated/onSlotCreated/onSlotChanged triggers described here — see
+> §6's note on why). §7.3's module structure is Firebase-era too; §7.4 is
+> the current one.
 
 ### 7.1 System diagram (context view)
 
@@ -354,6 +407,43 @@ functions/                    # Firebase Cloud Functions (Node.js/TypeScript), d
 ```
 
 `slotConflictChecker.ts` stays a pure function with no Firestore/React imports so it can be unit-tested directly with Jest, independent of the UI or network layer.
+
+### 7.4 Module structure (current — Supabase)
+
+```text
+src/
+├── models/                  # Staff, Course, Subject, Student, Slot, Attendance, Notification TS types
+├── data/
+│   ├── supabase.ts           Supabase client init (Auth persisted via AsyncStorage)
+│   ├── repositories/         staffRepository, courseRepository, subjectRepository,
+│   │                          studentRepository, slotRepository, attendanceRepository,
+│   │                          notificationRepository, authRepository — thin wrappers
+│   │                          around @supabase/supabase-js
+│   └── queries/               React Query hooks: useStaffList, useSlots, useAttendance, ...
+│                               + useNotificationsForStaff (polled, not live)
+├── domain/
+│   └── slotConflictChecker.ts # pure function, unit-testable in isolation (Jest) — unchanged
+├── screens/                  # unchanged from §7.3
+├── navigation/                 RootNavigator (role-gated: AdminNavigator / StaffNavigator)
+├── store/                       useAuthStore (Zustand) — session, role, current user
+└── App.tsx
+
+supabase/
+├── migrations/0001_init.sql   Postgres schema + Row Level Security policies —
+│                               the source of truth for the database layer
+└── functions/                 Edge Functions (Deno), deployed individually:
+    ├── create-staff/          creates a staff Auth account + staff/profiles rows
+    │                           (service_role key, checks caller is admin first)
+    └── delete-staff/          deletes a staff member's Auth account + rows
+                                (same service_role/admin-check pattern)
+```
+
+The only server-side logic this app has is the two Edge Functions above —
+both exist purely because creating/deleting an Auth user needs the
+`service_role` key, which can't live in the client. Every other repository
+talks to Postgres directly from the client, with Row Level Security as the
+only access control (no application-layer authorization checks needed
+server-side beyond what the RLS policies already enforce).
 
 ## 8. Development Plan (phased)
 
