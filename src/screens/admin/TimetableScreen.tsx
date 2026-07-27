@@ -2,7 +2,7 @@ import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { ActivityIndicator, Text } from "react-native-paper";
 import Centered from "../../components/Centered";
-import ConfirmDialog from "../../components/ConfirmDialog";
+import SlotDetailsDialog from "../../components/SlotDetailsDialog";
 import WeeklyTimetable from "../../components/WeeklyTimetable";
 import { useRemoveSlot, useSlotList } from "../../data/queries/slots";
 import { useSubjectList } from "../../data/queries/courses";
@@ -14,7 +14,7 @@ export default function TimetableScreen() {
   const { data: subjects } = useSubjectList();
   const { data: staff } = useStaffList();
   const removeSlot = useRemoveSlot();
-  const [pendingDelete, setPendingDelete] = useState<Slot | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
 
   if (slotsLoading || !slots || !subjects || !staff) {
     return (
@@ -24,33 +24,37 @@ export default function TimetableScreen() {
     );
   }
 
-  const pendingSubjectName = subjects.find((subject) => subject.id === pendingDelete?.subjectId)?.name;
+  const selectedSubjectName = subjects.find((subject) => subject.id === selectedSlot?.subjectId)?.name;
+  const selectedStaffName = staff.find((member) => member.id === selectedSlot?.staffId)?.name;
 
-  async function handleConfirmDelete() {
-    if (!pendingDelete) return;
-    await removeSlot.mutateAsync(pendingDelete.id);
-    setPendingDelete(null);
+  async function handleRemove() {
+    if (!selectedSlot) return;
+    await removeSlot.mutateAsync(selectedSlot.id);
+    setSelectedSlot(null);
   }
 
   return (
     <View style={styles.container}>
       <Text variant="bodySmall" style={styles.hint}>
-        Tap a class to remove it from the timetable.
+        Tap a class to see its details.
       </Text>
       <WeeklyTimetable
         slots={slots}
         subjects={subjects}
         staff={staff}
-        onSlotPress={(slot) => setPendingDelete(slot)}
+        onSlotPress={(slot) => setSelectedSlot(slot)}
       />
 
-      <ConfirmDialog
-        visible={pendingDelete !== null}
-        title="Remove this class?"
-        message={`This removes ${pendingSubjectName ?? "this class"} (${pendingDelete?.dayOfWeek} ${pendingDelete?.startTime}–${pendingDelete?.endTime}) from the timetable.`}
+      <SlotDetailsDialog
+        visible={selectedSlot !== null}
+        subjectName={selectedSubjectName ?? "Unknown subject"}
+        dayOfWeek={selectedSlot?.dayOfWeek ?? ""}
+        startTime={selectedSlot?.startTime ?? ""}
+        endTime={selectedSlot?.endTime ?? ""}
+        staffName={selectedStaffName}
         loading={removeSlot.isPending}
-        onConfirm={handleConfirmDelete}
-        onDismiss={() => setPendingDelete(null)}
+        onRemove={handleRemove}
+        onDismiss={() => setSelectedSlot(null)}
       />
     </View>
   );
