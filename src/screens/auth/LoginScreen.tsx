@@ -22,7 +22,7 @@ export default function LoginScreen({ navigation }: Props) {
           Staff Scheduling
         </Text>
         <Text variant="bodyMedium" style={styles.subtitle}>
-          Sign in with the account your admin gave you.
+          Sign in with the account given to you.
         </Text>
 
         <TextInput
@@ -54,14 +54,6 @@ export default function LoginScreen({ navigation }: Props) {
         >
           Forgot password?
         </Button>
-
-        <View style={styles.demoBox}>
-          <Text variant="labelSmall" style={styles.demoLabel}>
-            DEMO ACCOUNTS
-          </Text>
-          <Text variant="bodySmall">Admin: admin@school.edu / admin123</Text>
-          <Text variant="bodySmall">Staff: grace.mensah@school.edu / staff123</Text>
-        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -74,13 +66,4 @@ const styles = StyleSheet.create({
   subtitle: { marginBottom: 24, color: "#5B6773" },
   input: { marginBottom: 12 },
   forgotPassword: { marginTop: 4 },
-  demoBox: {
-    marginTop: 32,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#DBE2E8",
-    gap: 2,
-  },
-  demoLabel: { marginBottom: 4, letterSpacing: 1, color: "#5B6773" },
 });
