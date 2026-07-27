@@ -79,12 +79,15 @@ export async function add(input: NewStaffInput): Promise<Staff> {
   return toStaff(data as StaffRow);
 }
 
+/**
+ * Deleting the Auth account also needs the service role key — the
+ * delete-staff Edge Function handles the Auth user plus the staff/profiles
+ * rows together; slots and attendance for this staff member are already
+ * gone via ON DELETE CASCADE once the staff row is deleted.
+ */
 export async function remove(id: string): Promise<void> {
-  const { error } = await supabase.from("staff").delete().eq("id", id);
+  const { error } = await supabase.functions.invoke("delete-staff", {
+    body: { staffId: id },
+  });
   if (error) throw error;
-  await supabase.from("profiles").delete().eq("id", id);
-  // The Supabase Auth user itself can only be deleted with the service role
-  // key — that needs its own Edge Function (mirroring create-staff) if you
-  // want full account cleanup; slots and notifications for this staff member
-  // are already gone via ON DELETE CASCADE.
 }

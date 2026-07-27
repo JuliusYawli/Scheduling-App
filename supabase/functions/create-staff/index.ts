@@ -33,13 +33,13 @@ Deno.serve(async (req: Request) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-  // Scoped only to resolve *who* is calling, via their own JWT.
-  const callerClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
+  // auth.getUser() only inspects a client's own stored session by default;
+  // passing the caller's JWT explicitly is what actually verifies *their*
+  // token (global.headers on the client does not feed into this call).
+  const jwt = authHeader.replace(/^Bearer\s+/i, "");
   const {
     data: { user: caller },
-  } = await callerClient.auth.getUser();
+  } = await admin.auth.getUser(jwt);
   if (!caller) {
     return json({ error: "unauthorized" }, 401);
   }
