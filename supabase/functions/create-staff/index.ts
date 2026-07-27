@@ -20,7 +20,7 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "onboarding@resend.dev";
 
-async function sendWelcomeEmail(to: string, name: string): Promise<void> {
+async function sendWelcomeEmail(to: string, name: string, password: string): Promise<void> {
   if (!RESEND_API_KEY) return;
   try {
     await fetch("https://api.resend.com/emails", {
@@ -30,7 +30,11 @@ async function sendWelcomeEmail(to: string, name: string): Promise<void> {
         from: FROM_EMAIL,
         to,
         subject: "Your Staff Scheduling account is ready",
-        text: `Hi ${name}, your account has been created. Sign in with the email and password your admin gave you to see your timetable.`,
+        text:
+          `Hi ${name}, your account has been created.\n\n` +
+          `Email: ${to}\n` +
+          `Password: ${password}\n\n` +
+          `Sign in with these to see your timetable.`,
       }),
     });
   } catch {
@@ -109,7 +113,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "create-failed" }, 500);
   }
 
-  await sendWelcomeEmail(email, name);
+  await sendWelcomeEmail(email, name, password);
 
   return json(
     { id: uid, name, email, contact_number: contactNumber, subject_ids: subjectIds },
