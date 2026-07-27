@@ -1,6 +1,5 @@
-import type { AuthUser } from "../../models";
-import { db, networkDelay } from "../mockStore";
-import { ADMIN_ACCOUNT } from "../mock/seed";
+import { supabase } from "../supabase";
+import type { AuthUser, Role } from "../../models";
 
 export class InvalidCredentialsError extends Error {
   constructor() {
@@ -10,18 +9,35 @@ export class InvalidCredentialsError extends Error {
 }
 
 export async function login(email: string, password: string): Promise<AuthUser> {
-  await networkDelay();
   const normalizedEmail = email.trim().toLowerCase();
-
-  if (normalizedEmail === ADMIN_ACCOUNT.email && password === ADMIN_ACCOUNT.password) {
-    return { uid: "admin-1", email: ADMIN_ACCOUNT.email, role: "admin", name: ADMIN_ACCOUNT.name };
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: normalizedEmail,
+    password,
+  });
+  if (error || !data.user) {
+    throw new InvalidCredentialsError();
   }
 
-  const staff = db.staff.find((member) => member.email.toLowerCase() === normalizedEmail);
-  const expectedPassword = staff ? db.staffPasswords[staff.email] : undefined;
-  if (staff && expectedPassword === password) {
-    return { uid: staff.id, email: staff.email, role: "staff", staffId: staff.id, name: staff.name };
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role, name")
+    .eq("id", data.user.id)
+    .single();
+  if (profileError || !profile) {
+    await supabase.auth.signOut();
+    throw new InvalidCredentialsError();
   }
 
-  throw new InvalidCredentialsError();
+  const role = profile.role as Role;
+  return {
+    uid: data.user.id,
+    email: normalizedEmail,
+    role,
+    staffId: role === "staff" ? data.user.id : undefined,
+    name: profile.name,
+  };
+}
+
+export async function logout(): Promise<void> {
+  await supabase.auth.signOut();
 }

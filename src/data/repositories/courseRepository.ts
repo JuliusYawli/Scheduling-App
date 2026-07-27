@@ -1,5 +1,5 @@
+import { supabase } from "../supabase";
 import type { Course, Subject } from "../../models";
-import { db, networkDelay, nextId } from "../mockStore";
 
 export class DuplicateCourseNameError extends Error {
   constructor() {
@@ -8,27 +8,45 @@ export class DuplicateCourseNameError extends Error {
   }
 }
 
+function toCourse(row: { id: string; name: string }): Course {
+  return { id: row.id, name: row.name };
+}
+
 export async function list(): Promise<Course[]> {
-  await networkDelay();
-  return [...db.courses];
+  const { data, error } = await supabase.from("courses").select("*");
+  if (error) throw error;
+  return (data ?? []).map(toCourse);
 }
 
 export async function add(name: string, subjectNames: string[]): Promise<{ course: Course; subjects: Subject[] }> {
-  await networkDelay();
-  const normalizedName = name.trim().toLowerCase();
-  if (db.courses.some((existing) => existing.name.toLowerCase() === normalizedName)) {
-    throw new DuplicateCourseNameError();
+  const { data: courseRow, error: courseError } = await supabase
+    .from("courses")
+    .insert({ name: name.trim() })
+    .select()
+    .single();
+  if (courseError) {
+    if (courseError.code === "23505") throw new DuplicateCourseNameError();
+    throw courseError;
   }
-  const course: Course = { id: nextId("course"), name: name.trim() };
-  db.courses.push(course);
+  const course = toCourse(courseRow);
+
   const uniqueSubjectNames = [
     ...new Set(subjectNames.map((subjectName) => subjectName.trim()).filter(Boolean)),
   ];
-  const subjects = uniqueSubjectNames.map((subjectName) => ({
-    id: nextId("subject"),
-    name: subjectName,
-    courseId: course.id,
+  if (uniqueSubjectNames.length === 0) {
+    return { course, subjects: [] };
+  }
+
+  const { data: subjectRows, error: subjectError } = await supabase
+    .from("subjects")
+    .insert(uniqueSubjectNames.map((subjectName) => ({ name: subjectName, course_id: course.id })))
+    .select();
+  if (subjectError) throw subjectError;
+
+  const subjects: Subject[] = (subjectRows ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    courseId: row.course_id,
   }));
-  db.subjects.push(...subjects);
   return { course, subjects };
 }

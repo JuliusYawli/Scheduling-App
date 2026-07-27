@@ -1,9 +1,34 @@
+import { supabase } from "../supabase";
 import type { AttendanceRecord, AttendanceStatus } from "../../models";
-import { db, networkDelay, nextId } from "../mockStore";
+
+interface AttendanceRow {
+  id: string;
+  slot_id: string;
+  student_id: string;
+  date: string;
+  status: string;
+  marked_by_staff_id: string;
+}
+
+function toRecord(row: AttendanceRow): AttendanceRecord {
+  return {
+    id: row.id,
+    slotId: row.slot_id,
+    studentId: row.student_id,
+    date: row.date,
+    status: row.status as AttendanceStatus,
+    markedByStaffId: row.marked_by_staff_id,
+  };
+}
 
 export async function listForSlotAndDate(slotId: string, date: string): Promise<AttendanceRecord[]> {
-  await networkDelay();
-  return db.attendance.filter((record) => record.slotId === slotId && record.date === date);
+  const { data, error } = await supabase
+    .from("attendance")
+    .select("*")
+    .eq("slot_id", slotId)
+    .eq("date", date);
+  if (error) throw error;
+  return (data ?? []).map(toRecord);
 }
 
 export interface AttendanceEntry {
@@ -17,17 +42,23 @@ export async function saveAttendance(
   markedByStaffId: string,
   entries: AttendanceEntry[]
 ): Promise<void> {
-  await networkDelay();
-  db.attendance = db.attendance.filter(
-    (record) => !(record.slotId === slotId && record.date === date)
+  const { error: deleteError } = await supabase
+    .from("attendance")
+    .delete()
+    .eq("slot_id", slotId)
+    .eq("date", date);
+  if (deleteError) throw deleteError;
+
+  if (entries.length === 0) return;
+
+  const { error: insertError } = await supabase.from("attendance").insert(
+    entries.map((entry) => ({
+      slot_id: slotId,
+      date,
+      student_id: entry.studentId,
+      status: entry.status,
+      marked_by_staff_id: markedByStaffId,
+    }))
   );
-  const records: AttendanceRecord[] = entries.map((entry) => ({
-    id: nextId("attendance"),
-    slotId,
-    date,
-    studentId: entry.studentId,
-    status: entry.status,
-    markedByStaffId,
-  }));
-  db.attendance.push(...records);
+  if (insertError) throw insertError;
 }

@@ -1,6 +1,6 @@
+import { supabase } from "../supabase";
 import type { DayOfWeek, Slot } from "../../models";
 import { findConflict } from "../../domain/slotConflictChecker";
-import { db, networkDelay, nextId } from "../mockStore";
 import { notifyStaffOfSlot } from "./notificationRepository";
 
 export class SlotConflictError extends Error {
@@ -18,36 +18,70 @@ export interface NewSlotInput {
   endTime: string;
 }
 
+interface SlotRow {
+  id: string;
+  subject_id: string;
+  staff_id: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+}
+
+function toSlot(row: SlotRow): Slot {
+  return {
+    id: row.id,
+    subjectId: row.subject_id,
+    staffId: row.staff_id,
+    dayOfWeek: row.day_of_week as DayOfWeek,
+    startTime: row.start_time,
+    endTime: row.end_time,
+  };
+}
+
 export async function list(): Promise<Slot[]> {
-  await networkDelay();
-  return [...db.slots];
+  const { data, error } = await supabase.from("slots").select("*");
+  if (error) throw error;
+  return (data ?? []).map(toSlot);
 }
 
 export async function listByStaff(staffId: string): Promise<Slot[]> {
-  await networkDelay();
-  return db.slots.filter((slot) => slot.staffId === staffId);
+  const { data, error } = await supabase.from("slots").select("*").eq("staff_id", staffId);
+  if (error) throw error;
+  return (data ?? []).map(toSlot);
 }
 
 /**
- * Mirrors the design doc's Cloud Function trigger: a Firestore write to
- * /slots would fire onSlotCreated, which emails the staff member and writes
- * a notification doc. Here both happen inline since there's no real backend
- * yet — swapping to Firebase later moves the notification call into that
- * Cloud Function instead of this repository.
+ * Mirrors the design doc's notification trigger (§6): creating a slot would
+ * fire a server-side hook that emails the staff member and writes a
+ * notification row. The notification row is written here directly since
+ * there's no such trigger deployed yet — see notificationRepository.ts.
  */
 export async function add(input: NewSlotInput): Promise<Slot> {
-  await networkDelay();
-  const conflict = findConflict(db.slots, input);
+  const staffSlots = await listByStaff(input.staffId);
+  const conflict = findConflict(staffSlots, input);
   if (conflict) {
     throw new SlotConflictError(conflict);
   }
-  const slot: Slot = { id: nextId("slot"), ...input };
-  db.slots.push(slot);
-  notifyStaffOfSlot(slot, "slot_created");
+
+  const { data, error } = await supabase
+    .from("slots")
+    .insert({
+      subject_id: input.subjectId,
+      staff_id: input.staffId,
+      day_of_week: input.dayOfWeek,
+      start_time: input.startTime,
+      end_time: input.endTime,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const slot = toSlot(data);
+  await notifyStaffOfSlot(slot, "slot_created");
   return slot;
 }
 
 export async function remove(id: string): Promise<void> {
-  await networkDelay();
-  db.slots = db.slots.filter((slot) => slot.id !== id);
+  const { error } = await supabase.from("slots").delete().eq("id", id);
+  if (error) throw error;
 }
