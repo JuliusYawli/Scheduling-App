@@ -4,6 +4,7 @@ import StaffTimetableScreen from "../screens/staff/StaffTimetableScreen";
 import AttendanceSubjectListScreen from "../screens/staff/AttendanceSubjectListScreen";
 import AttendanceMarkScreen from "../screens/staff/AttendanceMarkScreen";
 import NotificationsScreen from "../screens/shared/NotificationsScreen";
+import ProfileScreen from "../screens/shared/ProfileScreen";
 import type { StaffStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<StaffStackParamList>();
@@ -20,6 +21,7 @@ export default function StaffNavigator() {
       />
       <Stack.Screen name="AttendanceMark" component={AttendanceMarkScreen} options={{ title: "Attendance" }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Notifications" }} />
+      <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
     </Stack.Navigator>
   );
 }

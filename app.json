@@ -3,6 +3,7 @@
     "name": "Staff Scheduling",
     "slug": "staff-scheduling-app",
     "version": "1.0.0",
+    "scheme": "staffscheduling",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

@@ -12,6 +12,7 @@ const TILES: { title: string; description: string; screen: keyof AdminStackParam
   { title: "Students", description: "Add students and enroll them in a course", screen: "StudentList" },
   { title: "Add Slot", description: "Schedule a subject with a staff member", screen: "AddSlot" },
   { title: "Timetable", description: "View the full weekly timetable", screen: "Timetable" },
+  { title: "Profile", description: "Account details and change your password", screen: "Profile" },
 ];
 
 export default function AdminDashboardScreen({ navigation }: Props) {

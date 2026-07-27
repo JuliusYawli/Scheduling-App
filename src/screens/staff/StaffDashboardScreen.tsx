@@ -48,6 +48,15 @@ export default function StaffDashboardScreen({ navigation }: Props) {
         </Card.Content>
       </Card>
 
+      <Card style={styles.card} onPress={() => navigation.navigate("Profile")}>
+        <Card.Content>
+          <Text variant="titleMedium">Profile</Text>
+          <Text variant="bodySmall" style={styles.cardDescription}>
+            Account details and change your password
+          </Text>
+        </Card.Content>
+      </Card>
+
       <Button onPress={logout} style={styles.signOut}>
         Sign out
       </Button>

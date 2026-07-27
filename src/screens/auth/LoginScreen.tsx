@@ -1,9 +1,13 @@
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { Button, HelperText, Text, TextInput } from "react-native-paper";
+import type { AuthStackParamList } from "../../navigation/types";
 import { useAuthStore } from "../../store/useAuthStore";
 
-export default function LoginScreen() {
+type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
+
+export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const { login, isLoading, error } = useAuthStore();
@@ -43,6 +47,14 @@ export default function LoginScreen() {
           Sign in
         </Button>
 
+        <Button
+          mode="text"
+          style={styles.forgotPassword}
+          onPress={() => navigation.navigate("ForgotPassword")}
+        >
+          Forgot password?
+        </Button>
+
         <View style={styles.demoBox}>
           <Text variant="labelSmall" style={styles.demoLabel}>
             DEMO ACCOUNTS
@@ -61,6 +73,7 @@ const styles = StyleSheet.create({
   title: { marginBottom: 4, fontWeight: "700" },
   subtitle: { marginBottom: 24, color: "#5B6773" },
   input: { marginBottom: 12 },
+  forgotPassword: { marginTop: 4 },
   demoBox: {
     marginTop: 32,
     padding: 12,

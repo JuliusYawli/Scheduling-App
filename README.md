@@ -27,7 +27,9 @@ Two roles, one app:
   enrolled in each subject they teach.
 
 Both roles get notified by email and in-app alerts when their timetable
-changes (new staff account, new slot, slot changed/removed).
+changes (new staff account, new slot, slot changed/removed). Both roles
+also have a Profile screen to change their password, and can reset a
+forgotten password from the login screen via an emailed link.
 
 ## Tech stack
 
@@ -124,6 +126,15 @@ step (it needs an account, so it can't be scripted for you):
    | Staff | `kwame.owusu@school.edu` | `staff123` |
 
    Safe to re-run — it skips anything that already exists.
+9. **Add the password-reset redirect URL.** Authentication → URL
+   Configuration → Redirect URLs → add `staffscheduling://reset-password`
+   (this is the app's URL scheme, set in `app.json`). Without this, the
+   "Forgot password?" email link won't be allowed to open back into the
+   app. Supabase's own built-in email sending (used for this one flow —
+   not Resend) has a low rate limit meant for testing; if you outgrow it,
+   configure custom SMTP under Authentication → Emails using Resend's SMTP
+   credentials (host `smtp.resend.com`, user `resend`, password = your
+   Resend API key).
 
 ## Running it
 
@@ -166,6 +177,12 @@ done the [Supabase setup](#supabase-setup) above):
   trigger — same simplification as the in-app notification row above, and
   for the same reason: one fewer moving part until it's worth the added
   complexity of a real trigger.
+- Forgot password (login screen) and change password (Profile screen, both
+  roles) both call real Supabase Auth — verified against the live project.
+  The one piece that needs an on-device test rather than an API check is
+  the deep link itself (tapping the emailed reset link actually reopening
+  the app to the reset-password screen), since that depends on the native
+  build registering the `staffscheduling://` URL scheme (see `app.json`).
 
 ## Project structure
 
@@ -179,9 +196,15 @@ src/
     repositories/            one file per entity, async, talks to Postgres/Auth
     queries/                  React Query hooks wrapping the repositories
   store/                   useAuthStore (Zustand) — session/role
-  navigation/              RootNavigator, AdminNavigator, StaffNavigator
+  navigation/              RootNavigator (also handles the password-reset
+                            deep link), AuthNavigator, AdminNavigator,
+                            StaffNavigator
   screens/
-    auth/ admin/ staff/ shared/
+    auth/                    LoginScreen, ForgotPasswordScreen,
+                              ResetPasswordScreen
+    admin/ staff/
+    shared/                  NotificationsScreen, ProfileScreen
+                              (change password — both roles)
   components/              small shared UI (WeeklyTimetable, Centered)
 scripts/
   seed-supabase.js         one-time demo data seed (service role key) — npm run seed

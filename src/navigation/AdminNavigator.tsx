@@ -8,6 +8,7 @@ import StudentListScreen from "../screens/admin/StudentListScreen";
 import AddStudentScreen from "../screens/admin/AddStudentScreen";
 import AddSlotScreen from "../screens/admin/AddSlotScreen";
 import TimetableScreen from "../screens/admin/TimetableScreen";
+import ProfileScreen from "../screens/shared/ProfileScreen";
 import type { AdminStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
@@ -24,6 +25,7 @@ export default function AdminNavigator() {
       <Stack.Screen name="AddStudent" component={AddStudentScreen} options={{ title: "Add Student" }} />
       <Stack.Screen name="AddSlot" component={AddSlotScreen} options={{ title: "Add Slot" }} />
       <Stack.Screen name="Timetable" component={TimetableScreen} options={{ title: "Timetable" }} />
+      <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
     </Stack.Navigator>
   );
 }

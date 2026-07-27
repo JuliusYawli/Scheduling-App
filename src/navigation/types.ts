@@ -1,3 +1,8 @@
+export type AuthStackParamList = {
+  Login: undefined;
+  ForgotPassword: undefined;
+};
+
 export type AdminStackParamList = {
   AdminDashboard: undefined;
   StaffList: undefined;
@@ -8,6 +13,7 @@ export type AdminStackParamList = {
   AddStudent: undefined;
   AddSlot: undefined;
   Timetable: undefined;
+  Profile: undefined;
 };
 
 export type StaffStackParamList = {
@@ -16,4 +22,5 @@ export type StaffStackParamList = {
   AttendanceSubjectList: undefined;
   AttendanceMark: { slotId: string; subjectName: string };
   Notifications: undefined;
+  Profile: undefined;
 };
