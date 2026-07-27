@@ -9,10 +9,34 @@
 // whoever's calling is actually an admin before creating anything.
 //
 // Deploy with: supabase functions deploy create-staff
+//
+// Also sends the "your account is ready" welcome email via Resend if
+// RESEND_API_KEY is set — best-effort, a failed send doesn't fail account
+// creation (the account and app access matter more than the email).
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "onboarding@resend.dev";
+
+async function sendWelcomeEmail(to: string, name: string): Promise<void> {
+  if (!RESEND_API_KEY) return;
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: FROM_EMAIL,
+        to,
+        subject: "Your Staff Scheduling account is ready",
+        text: `Hi ${name}, your account has been created. Sign in with the email and password your admin gave you to see your timetable.`,
+      }),
+    });
+  } catch {
+    // best-effort — account creation already succeeded by the time this runs
+  }
+}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -84,6 +108,8 @@ Deno.serve(async (req: Request) => {
     await admin.from("staff").delete().eq("id", uid);
     return json({ error: "create-failed" }, 500);
   }
+
+  await sendWelcomeEmail(email, name);
 
   return json(
     { id: uid, name, email, contact_number: contactNumber, subject_ids: subjectIds },

@@ -38,8 +38,8 @@
 |---|---|---|
 | Auth | Supabase Auth (`@supabase/supabase-js`, email/password) | Also pure JS — `AsyncStorage` passed as the session persistence adapter, no native modules. Role stored in a `profiles` row keyed by the Auth user's id |
 | Database | Supabase Postgres | Relational instead of document-based — foreign keys are real (`subjects.course_id references courses`, etc.) instead of plain ID fields. Access control is Postgres **Row Level Security** policies rather than Firestore security rules; see `supabase/migrations/0001_init.sql` |
-| Backend logic | **Supabase Edge Functions** (Deno) | Same reason as Cloud Functions: creating/deleting a staff member's Auth account needs the `service_role` key, which can't ship in the app. `create-staff` and `delete-staff` in `supabase/functions/` are the only two — everything else the app does is a direct, RLS-checked Postgres call from the client |
-| Email delivery | Not implemented | Would be a third Edge Function (e.g. triggered by a Postgres webhook on `slots` insert) calling an email API — same shape as the Firebase-era plan, just not built yet |
+| Backend logic | **Supabase Edge Functions** (Deno) | `create-staff` and `delete-staff` exist because Auth account creation/deletion needs the `service_role` key, which can't ship in the app; `send-email` exists because the Resend API key has the same constraint. Everything else the app does is a direct, RLS-checked Postgres call from the client |
+| Email delivery | **Resend**, via `send-email` + a step inside `create-staff` | Client-invoked, not trigger-driven (see §6's note) — a welcome email on staff creation, "new class scheduled" on slot creation. Best-effort: a failed send doesn't undo the underlying action |
 | In-app alerts | `notifications` table, polled by React Query (`refetchInterval`) | Written directly by the client when a slot is created (see `slotRepository.add`) rather than by a server-side trigger — functionally the same result, one fewer moving part until real-time/webhook-driven notifications are worth the complexity |
 
 The reason for the move, not a preference: Google now requires a billing
@@ -246,15 +246,22 @@ sequenceDiagram
 
 Overlap test: two ranges `[s1,e1)` and `[s2,e2)` conflict iff `s1 < e2 AND s2 < e1`. Run this client-side before write, and optionally re-validate in a Firestore Cloud Function if you want to guard against race conditions from concurrent admins.
 
-## 6. Notifications (Email + In-App Alerts) — email half superseded
+## 6. Notifications (Email + In-App Alerts) — superseded, client-invoked instead of trigger-driven
 
-> As shipped: in-app notifications work (§1.1) — the client writes the
-> notification row directly when a slot is created, no trigger involved.
-> Email is **not implemented**. The Cloud-Function-driven design below is
-> unchanged in shape if you build it — swap "Firestore" for "Postgres" and
-> "Cloud Function" for "Edge Function" (a Postgres webhook on `slots`
-> insert instead of an `onCreate` trigger) and the rest of this section
-> still describes the right architecture.
+> As shipped: both halves work, but neither is triggered by the database —
+> the client calls them directly right after the action that should notify
+> someone succeeds. In-app: `notifyStaffOfSlot` in
+> `src/data/repositories/notificationRepository.ts` writes the notification
+> row when a slot is created (§1.1). Email: the client calls the
+> `send-email` Edge Function after slot creation, and `create-staff` sends
+> a welcome email itself since it's already running server-side — both via
+> Resend. The sequence diagram below is still the right shape if you later
+> want a real trigger instead (swap "Firestore" for "Postgres", "Cloud
+> Function" for "Edge Function", and the `onCreate` trigger for a Postgres
+> webhook on `slots` insert) — the tradeoff today is that a client that
+> crashes between the underlying write and the notification call means the
+> notification silently doesn't fire, which a database-level trigger
+> wouldn't be susceptible to.
 
 Email can only be sent from a trusted server, never from the client app (that would mean shipping an email-provider API key inside the app bundle). So notifications are Cloud-Function-driven: a Firestore write triggers a function, which does two things in parallel — sends the email, and writes an in-app notification doc the client is already listening to.
 
@@ -286,10 +293,10 @@ The same pattern covers the "staff account created" welcome email (`onCreate` tr
 > §7.1/7.2 below are the original Firebase-era diagrams — same shape, wrong
 > nouns: read "Firestore" as "Postgres", "Firebase Authentication" as
 > "Supabase Auth", and "Cloud Functions" as "Edge Functions"
-> (`supabase/functions/create-staff` and `delete-staff`, not the
-> onStaffCreated/onSlotCreated/onSlotChanged triggers described here — see
-> §6's note on why). §7.3's module structure is Firebase-era too; §7.4 is
-> the current one.
+> (`supabase/functions/create-staff`, `delete-staff`, and `send-email`,
+> not the onStaffCreated/onSlotCreated/onSlotChanged triggers described
+> here — see §6's note on why). §7.3's module structure is Firebase-era
+> too; §7.4 is the current one.
 
 ### 7.1 System diagram (context view)
 
@@ -432,18 +439,24 @@ supabase/
 ├── migrations/0001_init.sql   Postgres schema + Row Level Security policies —
 │                               the source of truth for the database layer
 └── functions/                 Edge Functions (Deno), deployed individually:
-    ├── create-staff/          creates a staff Auth account + staff/profiles rows
-    │                           (service_role key, checks caller is admin first)
-    └── delete-staff/          deletes a staff member's Auth account + rows
-                                (same service_role/admin-check pattern)
+    ├── create-staff/          creates a staff Auth account + staff/profiles rows,
+    │                           then a welcome email (service_role key,
+    │                           checks caller is admin first)
+    ├── delete-staff/          deletes a staff member's Auth account + rows
+    │                           (same service_role/admin-check pattern)
+    └── send-email/            generic "send one email via Resend" function,
+                                called by slotRepository.add() (same
+                                service_role/admin-check pattern; needs the
+                                Resend API key, not the Auth Admin API)
 ```
 
-The only server-side logic this app has is the two Edge Functions above —
-both exist purely because creating/deleting an Auth user needs the
-`service_role` key, which can't live in the client. Every other repository
-talks to Postgres directly from the client, with Row Level Security as the
-only access control (no application-layer authorization checks needed
-server-side beyond what the RLS policies already enforce).
+The only server-side logic this app has is the three Edge Functions above.
+`create-staff`/`delete-staff` exist because Auth account creation/deletion
+needs the `service_role` key, which can't live in the client; `send-email`
+exists because the Resend API key has the same constraint. Every other
+repository talks to Postgres directly from the client, with Row Level
+Security as the only access control (no application-layer authorization
+checks needed server-side beyond what the RLS policies already enforce).
 
 ## 8. Development Plan (phased)
 

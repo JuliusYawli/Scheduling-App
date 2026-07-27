@@ -2,6 +2,7 @@ import { supabase } from "../supabase";
 import type { DayOfWeek, Slot } from "../../models";
 import { findConflict } from "../../domain/slotConflictChecker";
 import { notifyStaffOfSlot } from "./notificationRepository";
+import * as subjectRepository from "./subjectRepository";
 
 export class SlotConflictError extends Error {
   constructor(public conflictingSlot: Slot) {
@@ -51,10 +52,34 @@ export async function listByStaff(staffId: string): Promise<Slot[]> {
 }
 
 /**
- * Mirrors the design doc's notification trigger (§6): creating a slot would
- * fire a server-side hook that emails the staff member and writes a
- * notification row. The notification row is written here directly since
- * there's no such trigger deployed yet — see notificationRepository.ts.
+ * Best-effort: a failed email send shouldn't undo an otherwise-successful
+ * slot creation, so errors here are swallowed rather than thrown.
+ */
+async function sendSlotEmail(slot: Slot): Promise<void> {
+  try {
+    const [{ data: staffRow }, [subject]] = await Promise.all([
+      supabase.from("staff").select("email").eq("id", slot.staffId).single(),
+      subjectRepository.listByIds([slot.subjectId]),
+    ]);
+    if (!staffRow?.email) return;
+    const subjectName = subject?.name ?? "your subject";
+    await supabase.functions.invoke("send-email", {
+      body: {
+        to: staffRow.email,
+        subject: "New class added to your timetable",
+        text: `${subjectName} — ${slot.dayOfWeek} ${slot.startTime}–${slot.endTime}`,
+      },
+    });
+  } catch {
+    // in-app notification (below) already covers this — email is a bonus
+  }
+}
+
+/**
+ * Mirrors the design doc's notification trigger (§6): creating a slot fires
+ * both the in-app notification write (notifyStaffOfSlot) and an email via
+ * the send-email Edge Function — both client-invoked rather than by a
+ * server-side trigger, since there's no such trigger deployed.
  */
 export async function add(input: NewSlotInput): Promise<Slot> {
   const staffSlots = await listByStaff(input.staffId);
@@ -78,6 +103,7 @@ export async function add(input: NewSlotInput): Promise<Slot> {
 
   const slot = toSlot(data);
   await notifyStaffOfSlot(slot, "slot_created");
+  await sendSlotEmail(slot);
   return slot;
 }
 

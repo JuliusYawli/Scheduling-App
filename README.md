@@ -4,11 +4,9 @@ A cross-platform (iOS + Android) app for scheduling staff, building weekly
 timetables, and tracking student attendance — built to replace manual,
 paper-based tracking at colleges and institutes.
 
-> Status: wired up to a real Supabase project (Postgres + Auth) — you need
-> your own Supabase project's URL/keys to run it (see
-> [Supabase setup](#supabase-setup) below). Email notifications are the one
-> piece still not live (needs a paid email provider); see
-> [What's real vs mocked](#whats-real-vs-mocked). Full data model, screen
+> Status: wired up to a real Supabase project (Postgres + Auth) and Resend
+> for email — you need your own Supabase project's URL/keys and a Resend
+> API key to run it (see [Supabase setup](#supabase-setup) below). Full data model, screen
 > flows, and phased build plan:
 > [docs/design/system-design.md](docs/design/system-design.md) (written
 > against Firestore originally — the ER model and screen flows still apply,
@@ -39,7 +37,7 @@ changes (new staff account, new slot, slot changed/removed).
 | UI | React Native Paper, React Navigation |
 | State/data | React Query + Zustand |
 | Auth & database | Supabase (Postgres + Auth) |
-| Notifications | In-app: a Postgres row, polled by React Query. Email: not implemented — would need a Supabase Edge Function + an email provider |
+| Notifications | In-app: a Postgres row, polled by React Query. Email: Resend, via the `send-email` Edge Function and the welcome-email step in `create-staff` |
 
 Full rationale for the original choices (Firebase) is in the design doc;
 this app moved to Supabase to avoid a mandatory billing-account requirement
@@ -89,7 +87,27 @@ step (it needs an account, so it can't be scripted for you):
 
    Without this step, the "Add Staff" screen will fail — every other screen
    works without it.
-7. **Seed the demo accounts + data.** Project settings → API → copy the
+7. **Deploy the send-email Edge Function + set your Resend key.** Email
+   (welcome email on staff creation, "new class scheduled" email on slot
+   creation) needs a [Resend](https://resend.com/) API key — sign up (free
+   tier, no domain required to start) and copy an API key from the
+   dashboard, then:
+
+   ```sh
+   npx supabase secrets set RESEND_API_KEY=re_xxx
+   npx supabase functions deploy send-email
+   npx supabase functions deploy create-staff   # re-deploy: it also sends an email now
+   ```
+
+   Without a verified sending domain, Resend's shared sandbox sender
+   (`onboarding@resend.dev`, the default) can only deliver to **your own**
+   Resend account email — not real staff addresses. To send to real
+   inboxes, verify a domain at resend.com/domains, then set a `FROM_EMAIL`
+   secret on an address at that domain:
+   `npx supabase secrets set FROM_EMAIL=notifications@yourdomain.com`.
+   Email sending is best-effort everywhere it's called — a failed send
+   never blocks the underlying action (staff/slot creation still succeeds).
+8. **Seed the demo accounts + data.** Project settings → API → copy the
    `service_role` secret (never commit this, never put it in `.env` — it's
    only used once, from your terminal), then:
 
@@ -136,13 +154,18 @@ done the [Supabase setup](#supabase-setup) above):
 - Adding a slot writes the in-app notification row directly (client-side
   stand-in for a server-side trigger), so the bell icon and unread badge
   work today.
-- Adding a staff member calls the `create-staff` Edge Function (step 6
-  above) rather than creating the Auth account from the client directly —
-  that always has to happen server-side, with or without Firebase/Supabase,
-  since it needs a key that can't live in the app bundle.
-- **Not live:** the *email* half of notifications. Nothing in the app
-  depends on it — see the design doc §6 for what a real implementation
-  would look like (a `slots` insert trigger calling out to an email API).
+- Adding or removing a staff member calls the `create-staff` /
+  `delete-staff` Edge Functions (steps 6 above) rather than touching Auth
+  from the client directly — that always has to happen server-side, with
+  or without Firebase/Supabase, since it needs a key that can't live in the
+  app bundle.
+- Email notifications are live via Resend (step 7 above): a welcome email
+  on staff creation, a "new class scheduled" email on slot creation. Both
+  are client-invoked (the client calls the Edge Function right after the
+  underlying action succeeds) rather than fired by a server-side database
+  trigger — same simplification as the in-app notification row above, and
+  for the same reason: one fewer moving part until it's worth the added
+  complexity of a real trigger.
 
 ## Project structure
 
@@ -164,8 +187,12 @@ scripts/
   seed-supabase.js         one-time demo data seed (service role key) — npm run seed
 supabase/
   migrations/0001_init.sql  schema + Row Level Security policies
-  functions/create-staff/   Edge Function: the one privileged operation the
-                            app needs (see its header comment)
+  functions/
+    create-staff/           creates a staff Auth account + rows, then a
+                            welcome email (needs the service_role key)
+    delete-staff/            deletes a staff member's Auth account + rows
+    send-email/              generic "send one email via Resend" function,
+                            called after slot creation
 docs/
   design/
     system-design.md      # data model, screen flows, architecture, dev plan
