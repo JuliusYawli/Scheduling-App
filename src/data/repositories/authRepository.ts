@@ -42,30 +42,19 @@ export async function logout(): Promise<void> {
   await supabase.auth.signOut();
 }
 
-/**
- * Sends a password-reset email (Supabase's own built-in email sending, not
- * Resend — GoTrue handles this one itself). `redirectTo` is the deep link
- * the email's link opens the app back into; see RootNavigator for the
- * handler that reads the recovery tokens off that URL.
- */
+// Uses Supabase's own built-in email sending, not Resend. `redirectTo` is
+// the deep link the email opens back into — see RootNavigator.
 export async function requestPasswordReset(email: string, redirectTo: string): Promise<void> {
   const normalizedEmail = email.trim().toLowerCase();
   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, { redirectTo });
   if (error) throw error;
 }
 
-/**
- * Activates the one-time recovery session from the tokens embedded in the
- * password-reset deep link, so updatePassword() below has something to act
- * on. Doesn't throw on failure — an expired/reused link should just fail
- * quietly and let the reset screen show its own error state.
- */
 export async function establishRecoverySession(accessToken: string, refreshToken: string): Promise<boolean> {
   const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
   return !error;
 }
 
-/** Used both by the reset-password flow and the logged-in "change password" screen. */
 export async function updatePassword(newPassword: string): Promise<void> {
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) throw error;

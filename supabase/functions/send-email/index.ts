@@ -1,14 +1,6 @@
-// Sends a single transactional email via Resend.
-//
-// Called by the client right after a slot is created (see
-// src/data/repositories/slotRepository.ts) — mirrors how the in-app
-// notification row is already written client-side (§6 of the design doc).
-// This has to run server-side purely because the Resend API key can't ship
-// inside the app bundle; it doesn't touch the database at all.
-//
-// Requires the RESEND_API_KEY secret:
-//   supabase secrets set RESEND_API_KEY=re_xxx
-// Deploy with: supabase functions deploy send-email
+// Sends one transactional email via Resend. Called by the client right
+// after a slot is created (see slotRepository.ts) — runs here because the
+// Resend API key can't ship in the app bundle.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

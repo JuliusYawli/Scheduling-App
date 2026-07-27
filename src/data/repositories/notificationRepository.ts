@@ -37,11 +37,6 @@ export async function markRead(id: string): Promise<void> {
   if (error) throw error;
 }
 
-/**
- * Stands in for a Postgres trigger / Edge Function that would send email on
- * slot changes (docs/design/system-design.md §6) — writes the in-app
- * notification row directly from the client under the admin's session.
- */
 export async function notifyStaffOfSlot(slot: Slot, type: NotificationType): Promise<void> {
   const [subject] = await subjectRepository.listByIds([slot.subjectId]);
   const message = subject

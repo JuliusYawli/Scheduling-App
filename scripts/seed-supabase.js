@@ -1,20 +1,7 @@
 #!/usr/bin/env node
-/**
- * One-time, idempotent seed script for a real Supabase project — creates
- * the demo accounts and sample data described in the README, using the
- * service role key (bypasses Row Level Security, unlike the app itself).
- *
- * Setup:
- *   1. Supabase dashboard -> Project settings -> API -> copy the Project
- *      URL and the "service_role" secret (NOT the anon/public key).
- *   2. Run:
- *        SUPABASE_URL=https://xxxx.supabase.co \
- *        SUPABASE_SERVICE_ROLE_KEY=... \
- *        npm run seed
- *
- * Safe to re-run: matches on natural keys (email, course/subject/student
- * name, slot day+time) and skips anything that already exists.
- */
+// Seeds the demo accounts + sample data via the service role key (bypasses
+// RLS). Usage in README. Safe to re-run — matches on natural keys and
+// skips anything that already exists.
 const { createClient } = require("@supabase/supabase-js");
 
 const SUPABASE_URL = process.env.SUPABASE_URL;

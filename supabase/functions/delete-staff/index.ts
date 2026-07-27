@@ -1,13 +1,6 @@
-// Deletes a staff member's Auth account + staff/profiles rows.
-//
-// Mirrors create-staff: deleting an Auth user needs the Admin API, which
-// needs the service role key, which must never ship inside the app bundle.
-// The client (src/data/repositories/staffRepository.ts) calls this via
-// supabase.functions.invoke("delete-staff", ...); slots and attendance for
-// this staff member are already gone via ON DELETE CASCADE once the staff
-// row is deleted.
-//
-// Deploy with: supabase functions deploy delete-staff
+// Deletes a staff member's Auth account + staff/profiles rows. Mirrors
+// create-staff: needs the service role key server-side for the Auth Admin
+// API. Slots/attendance for this staff member cascade away on their own.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

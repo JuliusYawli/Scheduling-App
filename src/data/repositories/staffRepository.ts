@@ -50,15 +50,8 @@ export async function list(): Promise<Staff[]> {
   return (data ?? []).map(toStaff);
 }
 
-/**
- * Creating the Auth account has to happen server-side — it needs the
- * service role key, which must never ship inside the app bundle. The
- * create-staff Edge Function (supabase/functions/create-staff) holds that
- * key, checks the caller is really an admin, then creates the Auth user and
- * the staff/profiles rows together. supabase.functions.invoke automatically
- * forwards the admin's own session token, which the function uses for that
- * check.
- */
+// Account creation runs in the create-staff Edge Function — it needs the
+// service role key, which can't live in the app.
 export async function add(input: NewStaffInput): Promise<Staff> {
   const { data, error } = await supabase.functions.invoke("create-staff", {
     body: {
@@ -79,12 +72,6 @@ export async function add(input: NewStaffInput): Promise<Staff> {
   return toStaff(data as StaffRow);
 }
 
-/**
- * Deleting the Auth account also needs the service role key — the
- * delete-staff Edge Function handles the Auth user plus the staff/profiles
- * rows together; slots and attendance for this staff member are already
- * gone via ON DELETE CASCADE once the staff row is deleted.
- */
 export async function remove(id: string): Promise<void> {
   const { error } = await supabase.functions.invoke("delete-staff", {
     body: { staffId: id },

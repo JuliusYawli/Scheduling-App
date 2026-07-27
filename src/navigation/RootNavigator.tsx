@@ -12,12 +12,9 @@ interface RecoveryTokens {
   refreshToken: string;
 }
 
-/**
- * The password-reset email link opens as
- * `staffscheduling://reset-password#access_token=...&refresh_token=...&type=recovery`
- * — Supabase puts the tokens in the URL fragment (not a query string), so
- * they need pulling out manually rather than via a normal deep-link route.
- */
+// Supabase puts the recovery tokens in the URL fragment
+// (staffscheduling://reset-password#access_token=...&refresh_token=...),
+// not a query string, so they need pulling out by hand.
 function parseRecoveryTokens(url: string): RecoveryTokens | null {
   const hashIndex = url.indexOf("#");
   if (hashIndex === -1) return null;

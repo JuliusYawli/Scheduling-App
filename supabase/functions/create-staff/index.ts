@@ -1,18 +1,6 @@
-// Creates a staff member's Auth account + staff/profiles rows.
-//
-// This has to run server-side: creating an Auth user via the Admin API and
-// inserting into `profiles` need the service role key, which bypasses Row
-// Level Security entirely and must never ship inside the app bundle. The
-// client (src/data/repositories/staffRepository.ts) calls this via
-// supabase.functions.invoke("create-staff", ...), which automatically
-// forwards the admin's own session token — used below to check that
-// whoever's calling is actually an admin before creating anything.
-//
-// Deploy with: supabase functions deploy create-staff
-//
-// Also sends the "your account is ready" welcome email via Resend if
-// RESEND_API_KEY is set — best-effort, a failed send doesn't fail account
-// creation (the account and app access matter more than the email).
+// Creates a staff Auth account + staff/profiles rows, then a welcome email.
+// Runs server-side because it needs the service role key to call the Auth
+// Admin API and bypass RLS — that key can't ship inside the app.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -61,9 +49,8 @@ Deno.serve(async (req: Request) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-  // auth.getUser() only inspects a client's own stored session by default;
-  // passing the caller's JWT explicitly is what actually verifies *their*
-  // token (global.headers on the client does not feed into this call).
+  // getUser() needs the caller's JWT passed explicitly — it won't pick it
+  // up from a client's global headers.
   const jwt = authHeader.replace(/^Bearer\s+/i, "");
   const {
     data: { user: caller },

@@ -51,10 +51,7 @@ export async function listByStaff(staffId: string): Promise<Slot[]> {
   return (data ?? []).map(toSlot);
 }
 
-/**
- * Best-effort: a failed email send shouldn't undo an otherwise-successful
- * slot creation, so errors here are swallowed rather than thrown.
- */
+// Best-effort — a failed send shouldn't undo the slot creation.
 async function sendSlotEmail(slot: Slot): Promise<void> {
   try {
     const [{ data: staffRow }, [subject]] = await Promise.all([
@@ -75,12 +72,6 @@ async function sendSlotEmail(slot: Slot): Promise<void> {
   }
 }
 
-/**
- * Mirrors the design doc's notification trigger (§6): creating a slot fires
- * both the in-app notification write (notifyStaffOfSlot) and an email via
- * the send-email Edge Function — both client-invoked rather than by a
- * server-side trigger, since there's no such trigger deployed.
- */
 export async function add(input: NewSlotInput): Promise<Slot> {
   const staffSlots = await listByStaff(input.staffId);
   const conflict = findConflict(staffSlots, input);

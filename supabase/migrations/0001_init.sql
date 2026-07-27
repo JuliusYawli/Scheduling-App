@@ -1,22 +1,16 @@
 -- Schema + Row Level Security for the Staff Scheduling App.
--- Mirrors docs/design/system-design.md §3 (entity-relationship model) and
--- the Admin/Staff role split in §2. Run this in the Supabase SQL Editor, or
--- via `supabase db push` once the project is linked (see README).
+-- Run in the Supabase SQL Editor, or via `supabase db push` once linked.
 
 create extension if not exists pgcrypto;
 
--- profiles is the join between auth.users and app role, equivalent to
--- Firestore's old /users/{uid} doc. One row per Auth user (admin or staff).
+-- Join between auth.users and app role — one row per Auth user.
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   role text not null check (role in ('admin', 'staff')),
   name text not null
 );
 
--- Staff row id == the staff member's Auth user id (see the Edge Function in
--- supabase/functions/create-staff), same simplification the app used with
--- Firebase: one id doubles as both the profile key and the "staffId" the
--- rest of the schema references.
+-- id is the staff member's own Auth user id (see supabase/functions/create-staff).
 create table public.staff (
   id uuid primary key references auth.users (id) on delete cascade,
   name text not null,
@@ -133,9 +127,7 @@ create policy "attendance: write own or admin" on public.attendance
   using (marked_by_staff_id = auth.uid() or public.is_admin())
   with check (marked_by_staff_id = auth.uid() or public.is_admin());
 
--- Notifications: written by the admin app (slotRepository.add stands in for
--- the onSlotCreated trigger, see design doc §6); staff can read/mark-read
--- only their own.
+-- Notifications: written by the admin app; staff can read/mark-read only their own.
 create policy "notifications: read own or admin" on public.notifications
   for select using (recipient_staff_id = auth.uid() or public.is_admin());
 create policy "notifications: admin insert" on public.notifications
